@@ -1945,6 +1945,9 @@
     <file>
       <name>$PROJ_DIR$\INC\LiquidCrystal.h</name>
     </file>
+    <file>
+      <name>$PROJ_DIR$\INC\YiShanSensor.h</name>
+    </file>
   </group>
   <group>
     <name>LIB_INC</name>
@@ -2118,6 +2121,9 @@
     <name>SRC</name>
     <file>
       <name>$PROJ_DIR$\SRC\LiquidCrystal.c</name>
+    </file>
+    <file>
+      <name>$PROJ_DIR$\SRC\YiShanSensor.c</name>
     </file>
   </group>
   <file>

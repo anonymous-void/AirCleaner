@@ -29,8 +29,28 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm8s_it.h"
+#include "LiquidCrystal.h"
+#include "YiShanSensor.h"
 
-extern void TimingDelay_Decrement(void);
+extern volatile uint8_t mode_ctrl;
+extern volatile uint8_t speed_ctrl;
+
+extern volatile uint16_t TIM2_tick;
+
+// Key scan vars
+extern volatile uint8_t KEY_fall_flag;
+extern volatile uint8_t KEY_fall2_flag;
+extern volatile uint8_t KEY_up_flag;
+extern volatile uint8_t KEY_one_click_pre_flag;
+extern volatile uint8_t KEY_one_click_flag;
+extern volatile uint8_t KEY_long_press_flag;
+extern volatile uint8_t KEY_double_click_flag;
+
+extern volatile uint16_t KEY_fall_cnt;
+extern volatile uint16_t KEY_fall2_cnt;
+extern volatile uint16_t KEY_up_cnt;
+
+extern gc_LCD LCD;
 /** @addtogroup Template_Project
   * @{
   */
@@ -118,6 +138,11 @@ INTERRUPT_HANDLER(EXTI_PORTA_IRQHandler, 3)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+    if (GPIO_ReadInputPin(GPIOA, GPIO_PIN_3) == 0) {
+        // if it is the PA3 trigger this interrupt, Key_fall_flag = 1,
+        // leave other things to TIM4 Handler
+        KEY_fall_flag = 1;
+    }
 }
 
 /**
@@ -242,6 +267,7 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+
 }
 
 #if defined (STM8S903) || defined (STM8AF622x)
@@ -280,6 +306,19 @@ INTERRUPT_HANDLER(TIM1_CAP_COM_IRQHandler, 12)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+
+//    LCD_print("Mode ", &LCD);
+//    if (mode_ctrl == 0x00)
+//        LCD_print("Auto  ", &LCD);
+//    else
+//        LCD_print("Manual", &LCD);
+//
+//    LCD_setCursor(1, 0, &LCD); // Show speed bar on the 2ed line
+//    LCD_dispSpeed(speed_ctrl, &LCD);
+//
+//    LCD_setCursor(0, 0, &LCD); // reset cursor position
+     TIM2_tick ++;
+     TIM2_ClearITPendingBit(TIM2_IT_UPDATE);
  }
 
 /**
@@ -490,9 +529,53 @@ INTERRUPT_HANDLER(TIM6_UPD_OVF_TRG_IRQHandler, 23)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
-   TimingDelay_Decrement();
-   TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
+     if (KEY_fall_flag == 1) {
+         if (GPIO_ReadInputPin(GPIOA, GPIO_PIN_3) == 0) {
+             if (KEY_fall_cnt < 2000) {
+                 KEY_fall_cnt++;
+             }
+             else {
+                 // !!! Long press found
+                 KEY_fall_cnt = 0;
+                 KEY_one_click_flag = 0;
+                 KEY_long_press_flag = 1;
+                 KEY_fall_flag = 0;
 
+                 KEY_double_click_flag = 0;
+             }
+         }
+         else { // PA3 != 0, Key release detected
+             if (KEY_fall_cnt > 50) { // 按下时间大于50ms
+// Original one-click and double-click program
+                 // !!! One-click detected, KEY push between 50 ~ 2000ms.
+                 KEY_one_click_flag = 1;
+                 KEY_fall_cnt = 0;
+                 KEY_long_press_flag = 0; // ? should it be cleared ?
+                 KEY_fall_flag = 0;
+                 if (KEY_up_cnt > 100 && KEY_up_cnt < 500) {
+                 // !!! Double-click detected, if the time between last one-click and this time,
+                     KEY_double_click_flag = 1;
+                     KEY_one_click_flag = 0;
+                 }
+                 KEY_up_flag = 1;
+             }
+             else {
+                 KEY_fall_cnt = 0;
+                 KEY_one_click_flag = 0;
+                 KEY_long_press_flag = 0;
+                 KEY_fall_flag = 0;
+             }
+         }
+     }
+
+     if (KEY_up_flag == 1) {
+         KEY_up_cnt ++;
+     }
+     if (KEY_up_cnt > 500) {
+         KEY_up_cnt = 0;
+         KEY_up_flag = 0;
+     }
+    TIM4_ClearITPendingBit(TIM4_IT_UPDATE);
  }
 #endif /* (STM8S903) || (STM8AF622x)*/
 

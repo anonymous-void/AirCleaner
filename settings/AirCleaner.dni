@@ -1,3 +1,19 @@
+[Stack]
+FillEnabled=1
+OverflowWarningsEnabled=1
+WarningThreshold=90
+SpWarningsEnabled=1
+WarnLogOnly=1
+UseTrigger=1
+TriggerName=main
+LimitSize=0
+ByteLimit=50
+[DebugChecksum]
+Checksum=-228076915
+[CallStack]
+ShowArgs=0
+[Disassembly]
+MixedMode=1
 [InterruptLog]
 LogEnabled=0
 GraphEnabled=0
@@ -11,16 +27,6 @@ GraphEnabled=0
 ShowTimeLog=1
 SumEnabled=0
 ShowTimeSum=1
-[Stack]
-FillEnabled=1
-OverflowWarningsEnabled=1
-WarningThreshold=90
-SpWarningsEnabled=1
-WarnLogOnly=1
-UseTrigger=1
-TriggerName=main
-LimitSize=0
-ByteLimit=50
 [Breakpoints2]
 Count=0
 [Interrupts]
@@ -37,12 +43,10 @@ Enabled=0
 ShowSource=1
 [Simulator]
 Freq=16000000
-[DebugChecksum]
-Checksum=-797669634
-[CallStack]
-ShowArgs=0
-[Disassembly]
-MixedMode=1
+[watch_formats]
+Fmt0={W}42:gi16_pm2d5	4	0
+Fmt1={W}42:mode_ctrl	3	0
+Fmt2={W}42:speed_ctrl	3	0
 [DataSample]
 LogEnabled=0
 GraphEnabled=0
