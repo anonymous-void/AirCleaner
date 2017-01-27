@@ -8,9 +8,8 @@
 
 
 void print(char *str);
-
-
-
+void LCD_UI_print();
+void PWM_mode_manage(uint16_t arg_pm2d5);
 
 void delayMicroseconds(uint16_t arg) {
   uint16_t i = 0;
@@ -110,12 +109,12 @@ gc_PIN       myPin;
 gc_LCD       LCD;
 gc_LCD_DRAM  LCD_DRAM;
 gc_SENSOR_RX sensorRx;
-char gstr_pm2d5[10] = {0};
-uint16_t gi16_pm2d5 = 0;
+char gstr_pm2d5[10] = {0}; // String store the PM2.5
+uint16_t gi16_pm2d5 = 0; // Int store the PM2.5
 
-volatile uint8_t mode_ctrl;
-volatile uint8_t speed_ctrl;
-volatile uint8_t power_ctrl;
+volatile uint8_t mode_ctrl; // 0: Auto, 1: Manual
+volatile uint8_t speed_ctrl; // 0~14: 0% ~ 100%
+volatile uint8_t power_ctrl; // 0: OFF, 1: ON
 volatile uint16_t TIM2_tick;
 
 // Key scan vars
@@ -153,9 +152,9 @@ void main(void)
 // Timer Init
     // Timer1 for PWM
     TIM1_DeInit();
-    TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 0); // 1kHz PWM, // duty cycle = 50 %
-    TIM1_OC3Init(TIM1_OCMODE_PWM2, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_DISABLE,
-               500, TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_LOW,
+    TIM1_TimeBaseInit(16, TIM1_COUNTERMODE_UP, 1000, 0); // 1kHz PWM, /
+    TIM1_OC3Init(TIM1_OCMODE_PWM1, TIM1_OUTPUTSTATE_ENABLE, TIM1_OUTPUTNSTATE_DISABLE,
+               0, TIM1_OCPOLARITY_LOW, TIM1_OCNPOLARITY_LOW,
                TIM1_OCIDLESTATE_RESET, TIM1_OCNIDLESTATE_RESET);
 //    TIM1_OC1Init(TIM1_OCMODE_PWM1
     TIM1_ARRPreloadConfig(ENABLE);
@@ -190,10 +189,10 @@ void main(void)
     // enableInterrupts();
     // TIM2_Cmd(ENABLE);
 
-    LCD_portStructInit(GPIOC, GPIO_PIN_4,
-                       GPIOC, GPIO_PIN_5,
+    LCD_portStructInit(GPIOC, GPIO_PIN_7,
                        GPIOC, GPIO_PIN_6,
-                       GPIOC, GPIO_PIN_7,
+                       GPIOC, GPIO_PIN_5,
+                       GPIOC, GPIO_PIN_4,
                        GPIOD, GPIO_PIN_2,
                        GPIOD, GPIO_PIN_3,
                        GPIOB, GPIO_PIN_4,
@@ -218,88 +217,61 @@ void main(void)
 
     while(1)
     {
-    // LCD refresh program
-        if (LCD_tick != TIM2_tick) {
-            LCD_tick = TIM2_tick;
-
-//            LCD_print("Mode ", &LCD);
-//            if (mode_ctrl == 0x00)
-//                LCD_print("Auto  ", &LCD);
-//            else
-//                LCD_print("Manual", &LCD);
-            if (KEY_one_click_flag == 1) {
-                delay(200);
-                if (KEY_one_click_flag == 1) {
-                    KEY_one_click_flag = 0;
-                    speed_ctrl ++;
-                    if (speed_ctrl > 14)
-                        speed_ctrl = 0;
-                }
-            }
-            else if (KEY_double_click_flag == 1) {
-                KEY_double_click_flag = 0;
-                mode_ctrl = !mode_ctrl;
-                if (mode_ctrl == 0) {
-                    LCD_print("Auto  ", &LCD);
-                }
-                else {
-                    LCD_print("Manual", &LCD);
-                }
-            }
-            else if (KEY_long_press_flag == 1) {
-                KEY_long_press_flag = 0;
-                power_ctrl = !power_ctrl;
-                if (power_ctrl == 0) {
-                    LCD_print("Power Off", &LCD);
-                }
-                else {
-                    LCD_print("Power On", &LCD);
-                }
-            }
-//        else {
-//            LCD_print("no click", &LCD);
-//        }
-
-            LCD_setCursor(1, 0, &LCD); // Show speed bar on the 2ed line
-            LCD_dispSpeed(speed_ctrl, &LCD);
-
-            LCD_setCursor(0, 0, &LCD); // reset cursor position
-        }
-    // PWM duty cycle refresh program
-    TIM1_SetCompare3(71 * speed_ctrl);
-
-         gi16_pm2d5 = YS_getPM2d5(&sensorRx);
-        // UART1_SendData8(sensorRx.bit.pm2d5_msb);
-        // UART1_SendData8(sensorRx.bit.pm2d5_lsb);
-         while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
-         UART1_SendData8(sensorRx.bit.pm2d5_msb);
-         while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
-         UART1_SendData8(sensorRx.bit.pm2d5_lsb);
-        // UART1_SendData8((uint8_t)( (gi16_pm2d5 >> 8) & 0xff) );
-        // UART1_SendData8((uint8_t)( gi16_pm2d5 & 0xff) );
-        // UART1_SendData8('\r');
-        // UART1_SendData8('\n');
+      // [START] KEY event classification
+      // One-click event
+      if (KEY_one_click_flag == 1) {
+          delay(200);
+          if (KEY_one_click_flag == 1) {
+              KEY_one_click_flag = 0;
+              if (power_ctrl == 1 && mode_ctrl == 1) {
+                // speed only increase when Power is ON and Manual mode
+                speed_ctrl ++;
+                if (speed_ctrl > 14)
+                    speed_ctrl = 0;
+              }
+          }
+      }
+      // Double-click event
+      else if (KEY_double_click_flag == 1) {
+          KEY_double_click_flag = 0;
+          if (power_ctrl == 1) {
+            // mode change only when power is ON
+            mode_ctrl = !mode_ctrl; // Auto or Manual
+            if (mode_ctrl == 1)
+              speed_ctrl = 0; // when switch to Manual mode, set speed to 0.
+          }
+      }
+      // Long-press event
+      else if (KEY_long_press_flag == 1) {
+          KEY_long_press_flag = 0;
+          power_ctrl = !power_ctrl; // Power ON or OFF
+      }
+      // [END] KEY event classification
 
 
-        // LCD_writeCmd(LCD_CLEARDISPLAY, &LCD);
+      // [START] LCD refresh program, 2Hz
+      if (LCD_tick != TIM2_tick) {
+          LCD_tick = TIM2_tick;
+        LCD_UI_print();
+      }
+      // [END] LCD refresh program
 
-//        if (ccDone == 1) {
-//            UART1_SendData8( (uint8_t)(ccPeriod & 0xff00) >> 8 );
-//            UART1_SendData8( (uint8_t)(ccPeriod & 0x00ff) );
-//            UART1_SendData8('\n');
-//        }
-//        if (ccDone) {
-//          UART1_SendData8('P');
-//          UART1_SendData8(':');
-//          UART1_SendData8('=');
-//          UART1_SendData8( (uint8_t)((ccPeriod & 0xff00) >> 8) );
-//          UART1_SendData8( (uint8_t)(ccPeriod & 0x00ff) );
-//        }
-//        UART1_SendData8('P');
-        // print("ccData = ");
-        // UART1_SendData8( (uint8_t)(extFall >> 8) );
-        // UART1_SendData8( (uint8_t)(extFall) );
-        // print("\n");
+
+      // [START] PWM duty cycle refresh program
+      PWM_mode_manage(gi16_pm2d5);
+      TIM1_SetCompare3(62*speed_ctrl + 138);
+      // [END] PWM duty cycle refresh program
+
+      gi16_pm2d5 = YS_getPM2d5(&sensorRx);
+
+      int2str(sensorRx.bit.pm2d5_msb << 8 | sensorRx.bit.pm2d5_lsb, gstr_pm2d5);
+
+      while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+      UART1_SendData8(sensorRx.bit.pm2d5_msb);
+      while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
+      UART1_SendData8(sensorRx.bit.pm2d5_lsb);
+
+
     }
 }
 
@@ -313,6 +285,76 @@ void print(char *str)
     }
 }
 
+void LCD_UI_print()
+{/* Display all info on LCD 1602
+  There are 2 different pages, each for mode AUTO and MANUAL.
+  MODE = Auto:
+  PM2.5 xxx  AUTO
+  |-------------|14
+  MODE = Manual:
+  PM2.5 xxx  Manual
+  |-------------|14
+ */
+  if (power_ctrl == 0) {
+    // Power == OFF
+    speed_ctrl = 0;
+    LCD_print("   Power OFF", &LCD);
+    // Next line
+    LCD_setCursor(1, 0, &LCD); // Show speed bar on the 2ed line
+    LCD_print("PM2.5 ", &LCD);
+    LCD_print(gstr_pm2d5, &LCD);
+    LCD_print("ug/m     ", &LCD);
+    // Reset cursor position
+    LCD_setCursor(0, 0, &LCD); // reset cursor position
+  }
+  else {
+    // Power == ON
+    LCD_print("PM2.5 ", &LCD);
+    LCD_print(gstr_pm2d5, &LCD);
+    LCD_print("ug/m", &LCD);
+    if (mode_ctrl == 0) {
+      // mode == Auto
+      LCD_print(" AT", &LCD);
+    }
+    else {
+      // mode == MANUAL
+      LCD_print(" MT", &LCD);
+    }
+
+    // Next line
+    LCD_setCursor(1, 0, &LCD); // Show speed bar on the 2ed line
+    LCD_dispSpeed(speed_ctrl, &LCD);
+    // Reset cursor position
+    LCD_setCursor(0, 0, &LCD); // reset cursor position
+  }
+
+}
+
+void PWM_mode_manage(uint16_t arg_pm2d5)
+{
+  if (mode_ctrl == 0) {
+    // mode == AUTO
+    if (arg_pm2d5 < 50) {
+      speed_ctrl = 0;
+    }
+    else if (arg_pm2d5 >= 50 && arg_pm2d5 < 100) {
+      speed_ctrl = 1;
+    }
+    else if (arg_pm2d5 >= 100 && arg_pm2d5 < 200) {
+      speed_ctrl = 2;
+    }
+    else if (arg_pm2d5 >= 200 && arg_pm2d5 < 300) {
+      speed_ctrl = 3;
+    }
+    else if (arg_pm2d5 >= 300 && arg_pm2d5 < 400) {
+      speed_ctrl = 4;
+    }
+    else {
+      // PM2.5 > 400
+      speed_ctrl = 5;
+    }
+  }
+}
 #ifdef USE_FULL_ASSERT
 
 /**

@@ -32,7 +32,8 @@ uint16_t YS_getPM2d5(gc_SENSOR_RX *arg) {
             }
         }
     }
-
+    ret = ((arg->bit.pm2d5_msb << 8) | (arg->bit.pm2d5_lsb) );
+    return ret;
 }
 
 //------------------------------ string reverse function -----------------------------//
