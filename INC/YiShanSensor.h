@@ -47,6 +47,7 @@ typedef union gu_SENSOR_RX {
 
 void YS_StructInit(gc_SENSOR_RX * arg);
 void YS_Init();
+uint8_t YS_getFrame(gc_SENSOR_RX *arg);
 uint16_t YS_getPM2d5(gc_SENSOR_RX *arg);
 void int2str(uint16_t n, char s[]);
 

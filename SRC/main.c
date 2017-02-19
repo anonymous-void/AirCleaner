@@ -131,9 +131,10 @@ volatile uint16_t KEY_fall2_cnt;
 volatile uint16_t KEY_up_cnt;
 
 uint16_t LCD_tick;
-
+uint8_t frame_flag;
 void main(void)
 {
+    frame_flag = 0;
   /*High speed internal clock prescaler: 1*/
   // 主时钟的设置一定要先于外设初始化
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
@@ -262,7 +263,8 @@ void main(void)
       TIM1_SetCompare3(62*speed_ctrl + 138);
       // [END] PWM duty cycle refresh program
 
-      gi16_pm2d5 = YS_getPM2d5(&sensorRx);
+//      gi16_pm2d5 = YS_getPM2d5(&sensorRx);
+      frame_flag = YS_getFrame(&sensorRx);
 
       int2str(sensorRx.bit.pm2d5_msb << 8 | sensorRx.bit.pm2d5_lsb, gstr_pm2d5);
 
@@ -270,7 +272,6 @@ void main(void)
       UART1_SendData8(sensorRx.bit.pm2d5_msb);
       while (UART1_GetFlagStatus(UART1_FLAG_TXE) == RESET);
       UART1_SendData8(sensorRx.bit.pm2d5_lsb);
-
 
     }
 }
@@ -354,6 +355,11 @@ void PWM_mode_manage(uint16_t arg_pm2d5)
       speed_ctrl = 5;
     }
   }
+}
+
+void Sensor_mode_manage()
+{
+
 }
 #ifdef USE_FULL_ASSERT
 
